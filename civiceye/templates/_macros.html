@@ -1,0 +1,46 @@
+{% macro status_badge(status) -%}
+  {%- set cls = {'submitted':'secondary','under_review':'info','assigned':'primary','in_progress':'warning',
+                 'resolved':'success','rejected':'danger','reopened':'dark'}[status] -%}
+  {%- set icon = {'submitted':'○','under_review':'◐','assigned':'➜','in_progress':'⟳','resolved':'✓',
+                  'rejected':'✕','reopened':'↺'}[status] -%}
+  <span class="badge text-bg-{{ cls }}"><span aria-hidden="true">{{ icon }}</span> {{ STATUS_LABELS[status] }}</span>
+{%- endmacro %}
+
+{% macro demo_badge(item) -%}
+  {% if item.is_demo %}<span class="badge bg-warning text-dark" title="Synthetic demonstration data">DEMO</span>{% endif %}
+{%- endmacro %}
+
+{% macro band_badge(pr) -%}
+  {% if pr.provisional %}
+    <span class="badge text-bg-light border" title="Risk or location context not yet reviewed">Provisional · {{ '%.2f'|format(pr.total) }}</span>
+  {% else %}
+    {%- set cls = {'High':'danger','Medium':'warning','Low':'secondary'}.get(pr.band, 'secondary') -%}
+    <span class="badge text-bg-{{ cls }}">{{ pr.band }} · {{ '%.2f'|format(pr.total) }}{% if pr.overridden %} (override){% endif %}</span>
+  {% endif %}
+{%- endmacro %}
+
+{% macro csrf() -%}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{%- endmacro %}
+
+{% macro field_error(errors, name) -%}
+  {% if errors.get(name) %}<div class="invalid-feedback d-block" id="{{ name }}-error">{{ errors[name] }}</div>{% endif %}
+{%- endmacro %}
+
+{% macro priority_table(pr) %}
+<table class="table table-sm mb-2">
+  <caption class="small">P = 0.45R + 0.25L + 0.20A + 0.10C. Weights are a project design choice, not scientifically validated.</caption>
+  <thead><tr><th scope="col">Component</th><th scope="col">Value</th><th scope="col">Weight</th><th scope="col">Contribution</th></tr></thead>
+  <tbody>
+  {% for k, name in [('R','Reviewed safety risk'),('L','Location sensitivity'),('A','Unresolved age'),('C','Distinct corroboration')] %}
+    <tr>
+      <td>{{ k }}: {{ name }}</td>
+      <td>{% if pr.components[k] is none %}<em>Unknown</em>{% else %}{{ '%.2f'|format(pr.components[k]) }}{% endif %}</td>
+      <td>{{ pr.weights[k] }}</td>
+      <td>{{ '%.3f'|format(pr.weights[k] * (pr.components[k] or 0)) }}</td>
+    </tr>
+  {% endfor %}
+  <tr class="fw-semibold"><td colspan="3">Computed total</td><td>{{ '%.3f'|format(pr.computed) }}</td></tr>
+  {% if pr.overridden %}<tr class="fw-semibold"><td colspan="3">Override (staff)</td><td>{{ '%.3f'|format(pr.total) }}</td></tr>{% endif %}
+  </tbody>
+</table>
+<ul class="small mb-0">{% for r in pr.rationale %}<li>{{ r }}</li>{% endfor %}</ul>
+{% endmacro %}

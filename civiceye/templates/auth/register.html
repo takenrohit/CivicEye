@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, field_error with context %}
+{% block title %}Register{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-md-7 col-lg-6">
+  <h1 class="h3 mb-3">Create a citizen account</h1>
+  <p class="small text-muted">Only an email and display name are needed. Do not use your Aadhaar, phone number or address.</p>
+  <form method="post" novalidate>
+    {{ csrf() }}
+    <div class="mb-3">
+      <label for="email" class="form-label">Email</label>
+      <input type="email" class="form-control {% if errors.email %}is-invalid{% endif %}" id="email" name="email"
+             value="{{ form.email or '' }}" required autocomplete="email" aria-describedby="email-error">
+      {{ field_error(errors, 'email') }}
+    </div>
+    <div class="mb-3">
+      <label for="display_name" class="form-label">Display name</label>
+      <input type="text" class="form-control {% if errors.display_name %}is-invalid{% endif %}" id="display_name"
+             name="display_name" value="{{ form.display_name or '' }}" maxlength="80" required aria-describedby="display_name-error">
+      {{ field_error(errors, 'display_name') }}
+    </div>
+    <div class="mb-3">
+      <label for="password" class="form-label">Password</label>
+      <input type="password" class="form-control {% if errors.password %}is-invalid{% endif %}" id="password"
+             name="password" required autocomplete="new-password" aria-describedby="pw-help password-error">
+      <div id="pw-help" class="form-text">At least 10 characters, mixing letters with numbers or symbols.</div>
+      {{ field_error(errors, 'password') }}
+    </div>
+    <div class="mb-3">
+      <label for="password2" class="form-label">Confirm password</label>
+      <input type="password" class="form-control {% if errors.password2 %}is-invalid{% endif %}" id="password2"
+             name="password2" required autocomplete="new-password" aria-describedby="password2-error">
+      {{ field_error(errors, 'password2') }}
+    </div>
+    <div class="form-check mb-3">
+      <input class="form-check-input {% if errors.accept_terms %}is-invalid{% endif %}" type="checkbox" id="accept_terms" name="accept_terms" value="1">
+      <label class="form-check-label" for="accept_terms">I have read the <a href="{{ url_for('public.privacy') }}" target="_blank">privacy notice</a> and understand this is an academic prototype.</label>
+      {{ field_error(errors, 'accept_terms') }}
+    </div>
+    <button class="btn btn-primary w-100" type="submit">Create account</button>
+  </form>
+</div></div>
+{% endblock %}

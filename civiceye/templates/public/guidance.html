@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Reporting guidance{% endblock %}
+{% block content %}
+<h1 class="h3">Reporting guidance and limitations</h1>
+<div class="row g-4">
+  <div class="col-lg-7">
+    <h2 class="h5">How to report safely</h2>
+    <ul>
+      <li>Do not stand in traffic to take a photo. Your safety comes first.</li>
+      <li>Frame the issue itself. Avoid faces, number plates, house numbers and people's homes where possible.</li>
+      <li>Use your device location only if you are at the spot. Otherwise click the map to set the location, and correct it if the pin is wrong.</li>
+      <li>Describe what you saw in a sentence or two. Do not include names, phone numbers or ID numbers.</li>
+      <li>Check the "possible existing reports nearby" panel. If the same issue is already reported you may still submit; a reviewer decides whether reports are duplicates.</li>
+    </ul>
+    <h2 class="h5">Categories</h2>
+    <dl class="row">
+      {% for key, name in CATEGORIES.items() %}<dt class="col-sm-4">{{ name }}</dt><dd class="col-sm-8">
+        {% if key == 'pothole' %}Potholes, cracks, broken or uneven road surface.
+        {% elif key == 'garbage' %}Garbage dumps, scattered litter. (Not a verified "overflowing bin" detector.)
+        {% elif key == 'waterlogging' %}Standing or flooded water on roads/footpaths. Always selected manually.
+        {% elif key == 'streetlight' %}Non-working or damaged streetlights. Always selected manually: a daytime photo cannot show whether a light works.
+        {% else %}Any other civic issue.{% endif %}</dd>{% endfor %}
+    </dl>
+  </div>
+  <div class="col-lg-5">
+    <div class="card border-warning"><div class="card-body">
+      <h2 class="h5">Limitations</h2>
+      <ul class="small mb-0">
+        <li><strong>No trained image model is installed in this build.</strong> The app shows "AI unavailable" instead of guessing.</li>
+        <li>Category suggestions from the description use a <strong>keyword rule</strong>, not a trained model. The score is not a probability.</li>
+        <li>The app never estimates pothole depth, size, repair cost or danger from a photo. Risk is assessed by a human reviewer.</li>
+        <li>Priority scores are decision support. The weights are a design choice and have not been validated.</li>
+        <li>"Resolved" means a project reviewer marked it resolved. Unless resolution evidence is attached, it is <em>not independently verified</em>.</li>
+        <li>Not an emergency service. For emergencies call 112.</li>
+      </ul>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

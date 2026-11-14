@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Privacy and consent{% endblock %}
+{% block content %}
+<h1 class="h3">Privacy notice and consent</h1>
+<p class="text-muted small">Draft for the DSCE ISE community project. To be reviewed and approved by the project guide before any real pilot.</p>
+<div class="row g-4">
+  <div class="col-lg-8">
+    <h2 class="h5">What we collect</h2>
+    <ul>
+      <li>Account: email address, display name, and a securely hashed password (never stored in plain text).</li>
+      <li>Complaint: photo(s), short description, observation time, the location you set, optional landmark, and category.</li>
+      <li>Activity: status history, notes, feedback you send, and security logs (without passwords or session tokens).</li>
+    </ul>
+    <p>We do <strong>not</strong> ask for Aadhaar, government ID, phone number or home address. Please do not include them in descriptions.</p>
+
+    <h2 class="h5">How photos and locations are handled</h2>
+    <ul>
+      <li>Photos are re-encoded on upload. This removes embedded metadata (EXIF), including any GPS position stored by the camera. We do not read GPS from photos.</li>
+      <li>Your browser's location is used only if you press "Use my location" and grant permission.</li>
+      <li>Original photos and exact coordinates are visible only to you and project reviewers/administrators.</li>
+      <li>Public pages show only aggregate counts. Original photos are never published; there is no automatic face or number-plate blurring, so unreviewed images are not released.</li>
+      <li>The system does not perform face recognition or number-plate recognition.</li>
+    </ul>
+
+    <h2 class="h5">Retention (pilot policy)</h2>
+    <p>Pilot data is kept only for the academic project period (2026–27) and deleted or anonymised afterwards, unless the team's guide approves a different policy. You may ask the project team to delete your account and complaints.</p>
+
+    <h2 class="h5" id="consent">Consent statement</h2>
+    <div class="border rounded p-3 bg-light">
+      <p class="mb-1">By submitting a complaint I confirm that:</p>
+      <ol class="mb-0">
+        <li>I took the photo(s) or have the right to share them, and I tried to avoid identifiable people and number plates.</li>
+        <li>I agree that the photo, description and location will be stored and reviewed by the CivicEye project team for this academic pilot.</li>
+        <li>I understand that CivicEye is an academic prototype, not an official municipal portal or emergency service, and that no repair is guaranteed.</li>
+      </ol>
+    </div>
+  </div>
+</div>
+{% endblock %}
