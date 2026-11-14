@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+instance/
+.env
+*.db
+# datasets and model weights are never committed (licensing / size)
+data/
+weights/
+*.pt
+*.pth
+*.onnx
