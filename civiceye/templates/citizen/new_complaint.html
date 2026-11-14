@@ -8,18 +8,24 @@
 {% block content %}
 <h1 class="h3">Report a civic issue</h1>
 <p class="small text-muted">Fields marked * are required. Not an emergency service: for emergencies call 112.</p>
-{% if errors %}<div class="alert alert-danger" role="alert">Please fix the highlighted fields{% if errors.image %} and re-select your photos{% endif %}.</div>{% endif %}
+{% if errors %}<div class="alert alert-danger" role="alert">
+  Please fix the highlighted fields.
+  <strong>Choose your photo(s) again</strong>: browsers do not keep selected files when a form is sent back.
+</div>{% endif %}
 
 <form method="post" enctype="multipart/form-data" novalidate id="complaint-form"
-      data-suggest-url="{{ url_for('api.suggest_category') }}" data-nearby-url="{{ url_for('api.nearby') }}">
+      data-suggest-url="{{ url_for('api.suggest_category') }}" data-nearby-url="{{ url_for('api.nearby') }}"
+      data-max-image-bytes="{{ config.MAX_IMAGE_BYTES }}" data-max-request-bytes="{{ config.MAX_CONTENT_LENGTH }}"
+      data-max-extra="{{ config.MAX_EXTRA_IMAGES }}">
   {{ csrf() }}
   <div class="row g-4">
     <div class="col-lg-6">
       <fieldset class="mb-3">
         <legend class="h5">1. Photo</legend>
         <label for="image" class="form-label">Main photo of the issue *</label>
-        <input type="file" class="form-control {% if errors.image %}is-invalid{% endif %}" id="image" name="image"
-               accept="image/jpeg,image/png,image/webp" required aria-describedby="image-help image-error">
+        <input type="file" class="form-control {% if errors.image %}is-invalid{% elif errors %}border-warning{% endif %}" id="image" name="image"
+               accept="image/jpeg,image/png,image/webp" required aria-describedby="image-help image-error{% if errors and not errors.image %} image-reselect{% endif %}">
+        {% if errors and not errors.image %}<div class="form-text text-warning-emphasis fw-semibold" id="image-reselect">Choose the photo again before submitting.</div>{% endif %}
         <div id="image-help" class="form-text">JPEG, PNG or WebP, up to {{ config.MAX_IMAGE_BYTES // 1048576 }} MB. Metadata (including camera GPS) is removed on upload.</div>
         {{ field_error(errors, 'image') }}
         <img id="image-preview" class="img-fluid rounded mt-2 d-none evidence-img w-100" alt="Preview of the selected photo">

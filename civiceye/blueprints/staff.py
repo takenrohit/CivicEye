@@ -1,6 +1,7 @@
 """Reviewer / administrator views."""
 from __future__ import annotations
 
+import statistics
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
@@ -104,44 +105,57 @@ def dashboard():
     open_items = base.filter(Complaint.status.in_(OPEN_STATUSES)).all()
     scored = sorted(((c, _priority(c, now)) for c in open_items), key=lambda t: -t[1].total)
     high = [(c, p) for c, p in scored if p.band == "High"][:10]
+    # Resolution time: submission (created_at) → reviewer marked resolved (resolved_at),
+    # currently-resolved reports only. Reopened reports have resolved_at cleared.
     resolved = base.filter(Complaint.status == "resolved", Complaint.resolved_at.isnot(None)).all()
     res_days = [(c.resolved_at - c.created_at).total_seconds() / 86400 for c in resolved]
     resolution = {"n": len(res_days),
-                  "median_days": round(sorted(res_days)[len(res_days) // 2], 1) if res_days else None,
+                  "median_days": round(statistics.median(res_days), 1) if res_days else None,
                   "unresolved": len(open_items)}
     reopened_count = by_status.get("reopened", 0)
-    pending_reopen = ReopenRequest.query.filter_by(state="pending").count()
+    pending_reopen = (_data_filter(ReopenRequest.query.join(Complaint), data)
+                      .filter(ReopenRequest.state == "pending").count())
+    chart = {"cat_labels": [CATEGORIES.get(k, k) for k in by_category], "cat_values": list(by_category.values()),
+             "status_labels": [STATUS_LABELS.get(k, k) for k in by_status], "status_values": list(by_status.values())}
     return render_template("staff/dashboard.html", total=total, by_status=by_status, by_category=by_category,
+                           chart=chart,
                            unreviewed=unreviewed, high=high, resolution=resolution, data=data,
                            reopened_count=reopened_count, pending_reopen=pending_reopen,
                            provisional_count=sum(1 for _, p in scored if p.provisional))
 
 
+LIST_LIMIT = 500
+
+
+def _scored_rows(args, limit=None):
+    """Filtered complaints with priority. The band filter needs the computed score, so it
+    is applied in Python *before* any row limit (otherwise matches beyond the limit are lost)."""
+    now = utcnow()
+    rows = [(c, _priority(c, now)) for c in _filtered_query(args).all()]
+    band = args.get("band")
+    if band in {b for _, b in current_app.config["PRIORITY_BANDS"]}:
+        rows = [r for r in rows if r[1].band == band and not r[1].provisional]
+    total = len(rows)
+    return (rows[:limit] if limit else rows), total
+
+
 @bp.route("/complaints")
 @roles_required(*STAFF)
 def complaints():
-    q = _filtered_query(request.args)
-    items = q.limit(500).all()
-    now = utcnow()
-    rows = [(c, _priority(c, now)) for c in items]
-    band = request.args.get("band")
-    if band in {b for _, b in current_app.config["PRIORITY_BANDS"]}:
-        rows = [r for r in rows if r[1].band == band and not r[1].provisional]
-    return render_template("staff/complaints.html", rows=rows, departments=Department.query.all(),
-                           args=request.args)
+    rows, total = _scored_rows(request.args, limit=LIST_LIMIT)
+    return render_template("staff/complaints.html", rows=rows, total=total, limit=LIST_LIMIT,
+                           departments=Department.query.all(), args=request.args)
 
 
 @bp.route("/complaints/export.csv")
 @roles_required(*STAFF)
 def export_csv():
-    items = _filtered_query(request.args).all()
-    now = utcnow()
+    scored, _ = _scored_rows(request.args)  # same filters as the list page, no row limit
     header = ["complaint_id", "data_label", "created_utc", "status", "submitted_category", "reviewed_category",
               "department", "approx_lat", "approx_lon", "reviewed_risk", "location_sensitivity",
               "priority", "priority_band", "provisional", "landmark", "description"]
     rows = []
-    for c in items:
-        p = _priority(c, now)
+    for c, p in scored:
         rows.append([c.public_id, "DEMO" if c.is_demo else "REAL", c.created_at.isoformat(), c.status,
                      c.submitted_category, c.reviewed_category or "", c.department.name if c.department else "",
                      round(c.latitude, 4), round(c.longitude, 4), c.reviewed_risk if c.reviewed_risk else "",
@@ -161,7 +175,8 @@ def review(public_id):
     c = _get(public_id)
     cfg = current_app.config
     nearby = find_nearby(c.latitude, c.longitude, radius_m=cfg["DUPLICATE_RADIUS_M"],
-                         window_days=cfg["DUPLICATE_WINDOW_DAYS"], exclude_id=c.id, category=c.effective_category)
+                         window_days=cfg["DUPLICATE_WINDOW_DAYS"], is_demo=c.is_demo, exclude_id=c.id,
+                         category=c.effective_category)
     for n in nearby:
         n["same_reporter"] = n["complaint"].reporter_id == c.reporter_id
     reviewers = User.query.filter(User.role.in_(STAFF), User.is_active_account.is_(True)).all()
@@ -260,6 +275,9 @@ def assign(public_id):
     assignee_id = request.form.get("assignee_id", type=int)
     dep = db.session.get(Department, dep_id) if dep_id else None
     assignee = db.session.get(User, assignee_id) if assignee_id else None
+    if c.status in ("resolved", "rejected"):
+        flash("Closed complaints cannot be reassigned. Reopen it through a reopening request first.", "warning")
+        return _back(c)
     if dep is None:
         flash("Choose a department.", "danger")
         return _back(c)

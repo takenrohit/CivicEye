@@ -43,22 +43,36 @@ def _read_limited(file_storage, max_bytes: int) -> bytes:
 def validate_and_store_image(file_storage, upload_dir: str, config) -> StoredImage:
     data = _read_limited(file_storage, config["MAX_IMAGE_BYTES"])
     Image.MAX_IMAGE_PIXELS = config["MAX_IMAGE_PIXELS"]
+    store_side = config["STORE_MAX_SIDE"]
     try:
-        with Image.open(io.BytesIO(data)) as probe:
+        with Image.open(io.BytesIO(data)) as probe:  # header only, nothing decoded yet
             fmt = probe.format
+            w, h = probe.size
             probe.verify()
-        img = Image.open(io.BytesIO(data))
-        img.load()
-    except (UnidentifiedImageError, OSError, SyntaxError, Image.DecompressionBombError) as exc:
+    except Image.DecompressionBombError as exc:
+        raise UploadError("Image has too many pixels to process safely.") from exc
+    except (UnidentifiedImageError, OSError, SyntaxError) as exc:
         raise UploadError("File is not a valid JPEG, PNG or WebP image.") from exc
 
     if fmt not in ALLOWED_FORMATS:
         raise UploadError("Only JPEG, PNG or WebP images are accepted.")
-    w, h = img.size
     if min(w, h) < config["MIN_IMAGE_SIDE"] or max(w, h) > config["MAX_IMAGE_SIDE"]:
         raise UploadError(f"Image dimensions {w}×{h} are outside the accepted range.")
+    if fmt != "JPEG" and w * h > config["MAX_NON_JPEG_PIXELS"]:
+        # Only JPEG can be decoded at reduced scale; bound memory for PNG/WebP.
+        raise UploadError("PNG/WebP image is too large. Please upload a JPEG or a smaller image.")
+
+    try:
+        img = Image.open(io.BytesIO(data))
+        if fmt == "JPEG":
+            img.draft("RGB", (store_side, store_side))  # decode at 1/2, 1/4 or 1/8 scale when possible
+        img.load()
+    except (OSError, SyntaxError) as exc:
+        raise UploadError("File is not a valid JPEG, PNG or WebP image.") from exc
 
     img = ImageOps.exif_transpose(img)  # apply orientation, then drop all metadata on save
+    if max(img.size) > store_side:
+        img.thumbnail((store_side, store_side), Image.Resampling.LANCZOS)
     mime, ext = ALLOWED_FORMATS[fmt]
     if fmt == "JPEG" and img.mode not in ("RGB", "L"):
         img = img.convert("RGB")

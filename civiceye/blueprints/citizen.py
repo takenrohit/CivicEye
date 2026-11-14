@@ -52,7 +52,9 @@ def dashboard():
 
 @bp.route("/complaints/new", methods=["GET", "POST"])
 @roles_required(Role.CITIZEN)
-@limiter.limit(lambda: current_app.config["SUBMIT_RATE_LIMIT"], methods=["POST"])
+@limiter.limit(lambda: current_app.config["SUBMIT_RATE_LIMIT"], methods=["POST"],
+               deduct_when=lambda resp: resp.status_code == 302)  # count accepted complaints only
+@limiter.limit(lambda: current_app.config["SUBMIT_ATTEMPT_RATE_LIMIT"], methods=["POST"])
 def new_complaint():
     cfg = current_app.config
     detector = get_image_detector(cfg)
@@ -201,11 +203,12 @@ def clarify(public_id):
     if len(note) > cfg["DESCRIPTION_MAX"]:
         flash("Clarification is too long.", "danger")
         return redirect(url_for("citizen.complaint_detail", public_id=public_id))
-    existing = sum(1 for a in c.attachments if a.uploaded_by_id == current_user.id)
+    clar_photos = sum(1 for a in c.attachments if a.kind == "clarification")
     stored = None
     if f and f.filename:
-        if existing >= cfg["MAX_EXTRA_IMAGES"] + 2:
-            flash("Photo limit for this complaint reached.", "danger")
+        if clar_photos >= cfg["MAX_CLARIFICATION_IMAGES"]:
+            flash(f"You can add at most {cfg['MAX_CLARIFICATION_IMAGES']} clarification photos per complaint.",
+                  "danger")
             return redirect(url_for("citizen.complaint_detail", public_id=public_id))
         try:
             stored = validate_and_store_image(f, cfg["UPLOAD_DIR"], cfg)

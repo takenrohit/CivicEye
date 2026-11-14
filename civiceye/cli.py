@@ -12,7 +12,8 @@ from PIL import Image, ImageDraw
 from .blueprints.auth import EMAIL_RE, validate_password
 from .categories import CATEGORIES
 from .extensions import db
-from .models import (Assignment, Attachment, AuditEvent, CategoryDepartment, Complaint, Department, Notification,
+from .models import (Assignment, Attachment, AuditEvent, CategoryDepartment, Complaint, Department, Feedback,
+                     Notification,
                      ReopenRequest, Role, StatusEvent, User, utcnow)
 
 DEFAULT_DEPARTMENTS = {
@@ -89,26 +90,26 @@ def register(app):
         ensure_departments()
         rng = random.Random(seed)
         creds = []
-        users = []
-        for i in range(1, 4):
-            email = f"demo.citizen{i}@demo.civiceye.invalid"
+
+        def demo_user(email, name, role):
+            """Create or re-enable a demo account. A fresh random password is generated on
+            every run, so lost demo passwords are recovered by re-running seed-demo."""
             u = User.query.filter_by(email=email).first()
+            if u is not None and not u.is_demo:
+                raise click.ClickException(f"{email} exists and is not a demo account; refusing to touch it.")
             if u is None:
-                pw = secrets.token_urlsafe(12)
-                u = User(email=email, display_name=f"Demo Citizen {i}", role=Role.CITIZEN, is_demo=True)
-                u.set_password(pw)
+                u = User(email=email, display_name=name, role=role, is_demo=True)
                 db.session.add(u)
-                creds.append((email, pw))
-            users.append(u)
-        reviewer_email = "demo.reviewer@demo.civiceye.invalid"
-        reviewer = User.query.filter_by(email=reviewer_email).first()
-        if reviewer is None:
+            u.is_active_account = True
             pw = secrets.token_urlsafe(12)
-            reviewer = User(email=reviewer_email, display_name="Demo Reviewer (simulated officer)",
-                            role=Role.REVIEWER, is_demo=True)
-            reviewer.set_password(pw)
-            db.session.add(reviewer)
-            creds.append((reviewer_email, pw))
+            u.set_password(pw)
+            creds.append((email, role, pw))
+            return u
+
+        users = [demo_user(f"demo.citizen{i}@demo.civiceye.invalid", f"Demo Citizen {i}", Role.CITIZEN)
+                 for i in range(1, 4)]
+        reviewer = demo_user("demo.reviewer@demo.civiceye.invalid", "Demo Reviewer (simulated officer)",
+                             Role.REVIEWER)
         db.session.flush()
 
         center_lat, center_lon = app.config["MAP_DEFAULT_CENTER"]
@@ -170,10 +171,9 @@ def register(app):
         db.session.add(AuditEvent(action="cli.seed_demo", details={"count": count, "seed": seed}))
         db.session.commit()
         click.echo(f"Added {count} DEMO complaints.")
-        if creds:
-            click.echo("Generated demo credentials (local demo only; do not reuse in any deployment):")
-            for e, p in creds:
-                click.echo(f"  {e}  {p}")
+        click.echo("Demo credentials, regenerated on every run (local demo only; never reuse in a deployment):")
+        for e, role, p in creds:
+            click.echo(f"  {role:<9} {e}  {p}")
 
     @app.cli.command("purge-demo")
     @click.option("--yes", is_flag=True)
@@ -195,13 +195,33 @@ def register(app):
             ReopenRequest.query.filter_by(complaint_id=c.id).delete()
             db.session.delete(c)
         db.session.flush()
+        deleted = kept = 0
         for u in User.query.filter_by(is_demo=True).all():
-            if Complaint.query.filter_by(reporter_id=u.id).count() == 0:
-                Notification.query.filter_by(user_id=u.id).delete()
+            Notification.query.filter_by(user_id=u.id).delete()
+            Feedback.query.filter_by(user_id=u.id).delete()
+            # Audit events and actions on real complaints must not be rewritten, so a demo
+            # account that appears in them is deactivated instead of deleted.
+            referenced = any(q.first() is not None for q in (
+                Complaint.query.filter((Complaint.reporter_id == u.id) | (Complaint.assigned_to_id == u.id)),
+                StatusEvent.query.filter_by(actor_id=u.id),
+                Assignment.query.filter((Assignment.assignee_id == u.id) | (Assignment.assigned_by_id == u.id)),
+                Attachment.query.filter_by(uploaded_by_id=u.id),
+                ReopenRequest.query.filter((ReopenRequest.requested_by_id == u.id) |
+                                           (ReopenRequest.decided_by_id == u.id)),
+                AuditEvent.query.filter_by(actor_id=u.id),
+            ))
+            if referenced:
+                u.is_active_account = False
+                kept += 1
+            else:
                 db.session.delete(u)
-        db.session.add(AuditEvent(action="cli.purge_demo", details={"complaints": len(demo_complaints)}))
+                deleted += 1
+        db.session.add(AuditEvent(action="cli.purge_demo", details={"complaints": len(demo_complaints),
+                                                                    "users_deleted": deleted,
+                                                                    "users_deactivated": kept}))
         db.session.commit()
-        click.echo(f"Removed {len(demo_complaints)} demo complaints.")
+        click.echo(f"Removed {len(demo_complaints)} demo complaints; deleted {deleted} demo users, "
+                   f"deactivated {kept} that appear in the audit log (re-enabled by seed-demo).")
 
 
 def _demo_image(upload_dir, cat, n) -> str:

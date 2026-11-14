@@ -12,13 +12,23 @@
   const descEl = document.getElementById("description");
   const suggEl = document.getElementById("text-suggestion");
   const obsEl = document.getElementById("observed_at");
+  // Declared before any code path that can call checkNearby() (e.g. restoring
+  // coordinates after a failed submission), to avoid a temporal-dead-zone error.
+  let nearbyTimer = null;
+  let suggTimer = null;
 
-  // Default observation time = now (local)
-  if (!obsEl.value) {
-    const d = new Date();
-    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-    obsEl.value = d.toISOString().slice(0, 16);
+  // Default observation time = now in IST. The server interprets this field as
+  // Asia/Kolkata, so it must not depend on the browser's own time zone.
+  function nowIST() {
+    const parts = {};
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Kolkata", year: "numeric", month: "2-digit", day: "2-digit",
+      hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+    }).formatToParts(new Date()).forEach(function (p) { parts[p.type] = p.value; });
+    return parts.year + "-" + parts.month + "-" + parts.day + "T" + parts.hour + ":" + parts.minute;
   }
+  obsEl.max = nowIST();
+  if (!obsEl.value) obsEl.value = obsEl.max;
 
   // ---- Map ----
   const mapEl = document.getElementById("map");
@@ -48,13 +58,14 @@
 
   map.on("click", function (e) { setPoint(e.latlng.lat, e.latlng.lng, "manual", false); });
 
-  function fromInputs() {
+  function fromInputs(source) {
     const lat = parseFloat(latEl.value), lon = parseFloat(lonEl.value);
-    if (isFinite(lat) && isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) setPoint(lat, lon, "manual", true);
+    if (isFinite(lat) && isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180) setPoint(lat, lon, source, true);
   }
-  latEl.addEventListener("change", fromInputs);
-  lonEl.addEventListener("change", fromInputs);
-  if (latEl.value && lonEl.value) fromInputs();
+  latEl.addEventListener("change", function () { fromInputs("manual"); });
+  lonEl.addEventListener("change", function () { fromInputs("manual"); });
+  // After a failed submission the server re-renders the form: restore the pin and keep its original source.
+  if (latEl.value && lonEl.value) fromInputs(srcEl.value || "manual");
 
   document.getElementById("use-location").addEventListener("click", function () {
     if (!("geolocation" in navigator)) {
@@ -74,7 +85,6 @@
   });
 
   // ---- Nearby reports (no personal data returned) ----
-  let nearbyTimer = null;
   function checkNearby() {
     clearTimeout(nearbyTimer);
     nearbyTimer = setTimeout(function () {
@@ -105,8 +115,8 @@
 
   // ---- Text suggestion (keyword rule) ----
   const counter = document.getElementById("desc-count");
-  let suggTimer = null;
-  descEl.addEventListener("input", function () {
+  descEl.addEventListener("input", refreshSuggestion);
+  function refreshSuggestion() {
     counter.textContent = descEl.value.length + " characters.";
     clearTimeout(suggTimer);
     suggTimer = setTimeout(function () {
@@ -131,15 +141,67 @@
         suggEl.append(span, btn);
       }).catch(function () { suggEl.textContent = "Suggestion unavailable."; });
     }, 400);
-  });
+  }
+  // Re-rendered after a failed submission: show the suggestion for the kept description.
+  if (descEl.value.trim()) refreshSuggestion();
 
   // ---- Image preview ----
   const imgEl = document.getElementById("image");
+  const extraEl = document.getElementById("extra_images");
   const prev = document.getElementById("image-preview");
   imgEl.addEventListener("change", function () {
     const f = imgEl.files && imgEl.files[0];
-    if (!f) { prev.classList.add("d-none"); return; }
+    if (prev.src) URL.revokeObjectURL(prev.src);
+    if (!f) { prev.classList.add("d-none"); prev.removeAttribute("src"); return; }
     prev.src = URL.createObjectURL(f);
     prev.classList.remove("d-none");
+  });
+
+  // ---- Client-side size check (the server re-checks everything) ----
+  // Without this, an oversized request is cut off by the server and the browser shows
+  // a connection error instead of a helpful message.
+  const maxImage = parseInt(form.dataset.maxImageBytes, 10);
+  const maxRequest = parseInt(form.dataset.maxRequestBytes, 10);
+  const maxExtra = parseInt(form.dataset.maxExtra, 10);
+  // Round file sizes up and limits down so "21.0 MB; the limit is 20.0 MB" never reads as equal.
+  const mb = function (n, down) {
+    const v = n / 1048576;
+    return (down ? Math.floor(v * 10) : Math.ceil(v * 10)) / 10 + " MB";
+  };
+  function setFileError(input, msg) {
+    input.setCustomValidity(msg);
+    input.classList.toggle("is-invalid", !!msg);
+    let el = document.getElementById(input.id + "-client-error");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = input.id + "-client-error";
+      el.className = "invalid-feedback d-block";
+      el.setAttribute("aria-live", "polite");
+      input.insertAdjacentElement("afterend", el);
+    }
+    el.textContent = msg;
+  }
+  function checkFiles() {
+    const main = imgEl.files[0];
+    const extras = Array.from(extraEl.files || []);
+    let total = 0;
+    setFileError(imgEl, main && main.size > maxImage ? "This photo is " + mb(main.size) + "; the limit is " + mb(maxImage, true) + "." : "");
+    if (main) total += main.size;
+    let extraMsg = extras.length > maxExtra ? "Choose at most " + maxExtra + " additional photos." : "";
+    extras.forEach(function (f) {
+      total += f.size;
+      if (!extraMsg && f.size > maxImage) extraMsg = f.name + " is " + mb(f.size) + "; the limit is " + mb(maxImage, true) + " per photo.";
+    });
+    if (!extraMsg && total > maxRequest) extraMsg = "All photos together are " + mb(total) + "; the limit is " + mb(maxRequest, true) + ".";
+    setFileError(extraEl, extraMsg);
+    return !imgEl.validationMessage && !extraEl.validationMessage;
+  }
+  imgEl.addEventListener("change", checkFiles);
+  extraEl.addEventListener("change", checkFiles);
+  form.addEventListener("submit", function (e) {
+    if (!checkFiles()) {
+      e.preventDefault();
+      (imgEl.validationMessage ? imgEl : extraEl).focus();
+    }
   });
 })();
