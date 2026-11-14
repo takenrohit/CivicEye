@@ -87,6 +87,11 @@ def test_notifications_are_private(client, citizen, citizen2):
     assert n.message.encode() not in page.data
 
 
+def test_referrer_policy_allows_map_tiles(client):
+    # OSM tile servers block requests without a Referer; only the origin is sent cross-site.
+    assert client.get("/").headers["Referrer-Policy"] == "strict-origin-when-cross-origin"
+
+
 def test_public_pages(client):
     for url in ("/", "/guidance", "/privacy", "/login", "/register"):
         r = client.get(url)

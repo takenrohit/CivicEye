@@ -14,7 +14,7 @@
 | Uploads | Decoded with Pillow; only JPEG/PNG/WebP; size, pixel-count and dimension limits; re-encoded (drops EXIF incl. GPS and trailing payloads); random filenames; stored outside `static/`; served only via an authorised route with `Cache-Control: no-store`; path-traversal guard |
 | Output | Jinja autoescaping; JS builds DOM with `textContent`; JSON passed through `tojson` |
 | CSV | Cells starting with `= + - @ TAB CR` are prefixed with `'`; reporter identities excluded; coordinates rounded to 4 dp; each export audited |
-| Headers | `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy` |
+| Headers | `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` (other sites see only the origin, never paths containing complaint IDs; OSM tile servers reject requests without a Referer), `Permissions-Policy` |
 | Redirects | `next` parameter restricted to local paths |
 | Third-party scripts | CDN assets pinned with SRI hashes (verified) |
 

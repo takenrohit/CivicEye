@@ -99,6 +99,7 @@ MANUAL_WORK.md       tasks the team must do outside the software
 - `RuntimeError: CIVICEYE_SECRET_KEY is not set`: create `.env` from `.env.example` and set the key.
 - `Python was not found`: use `py -3.11` (Windows launcher) or install Python 3.11.
 - Map is grey: no internet access, or the tile provider is blocked. Coordinates can still be typed.
+- Map tiles say "Access blocked": OpenStreetMap rejects tile requests that carry no `Referer`. The app sends `Referrer-Policy: strict-origin-when-cross-origin` for this reason; do not change it to `no-referrer` or `same-origin`. Browser extensions that strip referrers cause the same problem. Hard-refresh (Ctrl+F5) after fixing.
 - "Use my location" does nothing: browsers allow geolocation only on `localhost`/HTTPS and after permission. Click the map instead.
 - `400 Bad request` after leaving a form open for hours: the CSRF token expired (4 h). Reload the page.
 - `429 Too many requests`: login (10/min), registration (5/min) and submission (10/hour) are rate-limited.
