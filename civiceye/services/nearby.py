@@ -11,13 +11,18 @@ from ..models import Complaint, utcnow
 from .geo import bounding_box, haversine_m
 
 
-def find_nearby(lat: float, lon: float, *, radius_m: float, window_days: int, exclude_id: int | None = None,
-                category: str | None = None, limit: int = 10):
+def find_nearby(lat: float, lon: float, *, radius_m: float, window_days: int, is_demo: bool,
+                exclude_id: int | None = None, category: str | None = None, include_rejected: bool = True,
+                limit: int = 10):
+    """Reports within radius_m and window_days, from the same data set (demo or real) only."""
     lo_lat, hi_lat, lo_lon, hi_lon = bounding_box(lat, lon, radius_m)
     since = utcnow() - timedelta(days=window_days)
     q = Complaint.query.filter(Complaint.latitude.between(lo_lat, hi_lat),
                                Complaint.longitude.between(lo_lon, hi_lon),
-                               Complaint.created_at >= since)
+                               Complaint.created_at >= since,
+                               Complaint.is_demo.is_(bool(is_demo)))
+    if not include_rejected:
+        q = q.filter(Complaint.status != "rejected")
     if exclude_id is not None:
         q = q.filter(Complaint.id != exclude_id)
     out = []

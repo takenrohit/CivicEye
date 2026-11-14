@@ -29,7 +29,7 @@
     <a class="btn btn-sm btn-outline-success" href="{{ url_for('staff.export_csv', **args.to_dict()) }}">Export CSV</a>
   </div>
 </form>
-<p class="small text-muted">{{ rows|length }} report(s). "Reviewed priority" filter excludes provisional scores. CSV excludes reporter identities and rounds coordinates to 4 decimals.</p>
+<p class="small text-muted">{{ total }} report(s){% if total > limit %}, showing the newest {{ limit }}; narrow the filters or use the CSV export for all{% endif %}. "Reviewed priority" filter excludes provisional scores. CSV excludes reporter identities and rounds coordinates to 4 decimals.</p>
 <div class="table-responsive">
 <table class="table table-sm table-hover align-middle">
   <thead><tr><th scope="col">ID</th><th scope="col">Category</th><th scope="col">Status</th><th scope="col">Priority</th><th scope="col">Department</th><th scope="col">Submitted</th></tr></thead>

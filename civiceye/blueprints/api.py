@@ -1,6 +1,6 @@
 """Small JSON endpoints used by the complaint form. Authenticated; no personal data returned."""
 from flask import Blueprint, current_app, jsonify, request
-from flask_login import login_required
+from flask_login import current_user, login_required
 
 from ..ai import text as text_ai
 from ..categories import CATEGORIES
@@ -35,8 +35,11 @@ def nearby():
         return jsonify({"error": "invalid coordinates"}), 400
     cfg = current_app.config
     cat = request.args.get("category")
+    # Same data set as the user's own reports (demo accounts see demo data only);
+    # rejected reports are not "existing reports" for the citizen.
     rows = find_nearby(float(lat), float(lon), radius_m=cfg["DUPLICATE_RADIUS_M"],
-                       window_days=cfg["DUPLICATE_WINDOW_DAYS"], category=cat if cat in CATEGORIES else None)
+                       window_days=cfg["DUPLICATE_WINDOW_DAYS"], is_demo=current_user.is_demo,
+                       category=cat if cat in CATEGORIES else None, include_rejected=False)
     # Deliberately excludes IDs, reporter, description, images and exact coordinates.
     return jsonify({
         "radius_m": cfg["DUPLICATE_RADIUS_M"], "window_days": cfg["DUPLICATE_WINDOW_DAYS"],

@@ -101,6 +101,8 @@ def _register_template_helpers(app: Flask) -> None:
 def _register_errors(app: Flask) -> None:
     for code in (400, 403, 404, 413, 429, 500):
         def handler(e, code=code):
+            if code == 500:
+                db.session.rollback()  # the page itself queries the DB (notification badge)
             return render_template("error.html", code=code, error=e), code
         app.register_error_handler(code, handler)
 
