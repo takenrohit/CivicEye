@@ -37,7 +37,7 @@ Result: **36/36 checks passed** in headless Microsoft Edge (Playwright, browser 
 | Bug | Effect | Fix |
 |---|---|---|
 | `Referrer-Policy: same-origin` | OpenStreetMap served "Access blocked" tiles | `strict-origin-when-cross-origin` |
-| Blocked tiles cached by the browser | Map still blocked on ordinary loads (e.g. after a failed upload) until a hard refresh | Fixed by the header; clear cached images once (see README) |
+| Map reported blocked after an upload | Not reproduced: with the fixed header, 22/22 tiles loaded after a failed upload in Edge. OSM sends blocked tiles with `Cache-Control: no-cache`, so a stale cache is unlikely; the likely cause is a page loaded before the server restart, or a browser extension stripping the Referer | No code change; README troubleshooting updated |
 | `nearbyTimer` used before declaration | JS error after a failed submission: pin, nearby check and suggestion not restored | Declare timers first; restore pin with its original location source and re-run the suggestion |
 | Observation time defaulted to the browser's time zone | Wrong time (or "future time" error) on devices not set to IST | Compute the default in Asia/Kolkata; set `max` |
 | 8 MB / 10,000 px limits | Typical phone photos (9–20 MB, up to 108 MP) rejected | 20 MB per photo, JPEG decoded at reduced scale, stored copy downscaled to 2560 px |
