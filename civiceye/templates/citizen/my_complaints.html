@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, demo_badge with context %}
+{% block title %}My complaints{% endblock %}
+{% block content %}
+<h1 class="h3">My complaints</h1>
+{% if items %}
+<div class="table-responsive">
+<table class="table table-hover align-middle">
+  <thead><tr><th scope="col">ID</th><th scope="col">Category</th><th scope="col">Submitted</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Open</span></th></tr></thead>
+  <tbody>
+  {% for c in items %}
+  <tr>
+    <td><code>{{ c.public_id }}</code> {{ demo_badge(c) }}</td>
+    <td>{{ category_label(c.effective_category) }}{% if c.reviewed_category and c.reviewed_category != c.submitted_category %} <small class="text-muted">(you chose {{ category_label(c.submitted_category) }})</small>{% endif %}</td>
+    <td>{{ c.created_at|local }}</td>
+    <td>{{ status_badge(c.status) }}</td>
+    <td><a href="{{ url_for('citizen.complaint_detail', public_id=c.public_id) }}">Details<span class="visually-hidden"> for {{ c.public_id }}</span></a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="text-muted">No complaints yet. <a href="{{ url_for('citizen.new_complaint') }}">Report an issue</a>.</p>
+{% endif %}
+{% endblock %}

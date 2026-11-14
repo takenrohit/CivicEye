@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, field_error with context %}
+{% block title %}Report an issue{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+{% endblock %}
+{% block content %}
+<h1 class="h3">Report a civic issue</h1>
+<p class="small text-muted">Fields marked * are required. Not an emergency service: for emergencies call 112.</p>
+{% if errors %}<div class="alert alert-danger" role="alert">Please fix the highlighted fields{% if errors.image %} and re-select your photos{% endif %}.</div>{% endif %}
+
+<form method="post" enctype="multipart/form-data" novalidate id="complaint-form"
+      data-suggest-url="{{ url_for('api.suggest_category') }}" data-nearby-url="{{ url_for('api.nearby') }}">
+  {{ csrf() }}
+  <div class="row g-4">
+    <div class="col-lg-6">
+      <fieldset class="mb-3">
+        <legend class="h5">1. Photo</legend>
+        <label for="image" class="form-label">Main photo of the issue *</label>
+        <input type="file" class="form-control {% if errors.image %}is-invalid{% endif %}" id="image" name="image"
+               accept="image/jpeg,image/png,image/webp" required aria-describedby="image-help image-error">
+        <div id="image-help" class="form-text">JPEG, PNG or WebP, up to {{ config.MAX_IMAGE_BYTES // 1048576 }} MB. Metadata (including camera GPS) is removed on upload.</div>
+        {{ field_error(errors, 'image') }}
+        <img id="image-preview" class="img-fluid rounded mt-2 d-none evidence-img w-100" alt="Preview of the selected photo">
+        <label for="extra_images" class="form-label mt-3">Additional photos (optional, up to {{ config.MAX_EXTRA_IMAGES }})</label>
+        <input type="file" class="form-control {% if errors.extra_images %}is-invalid{% endif %}" id="extra_images"
+               name="extra_images" accept="image/jpeg,image/png,image/webp" multiple aria-describedby="extra_images-error">
+        {{ field_error(errors, 'extra_images') }}
+      </fieldset>
+
+      <fieldset class="mb-3">
+        <legend class="h5">2. Description</legend>
+        <label for="description" class="form-label">What did you see? *</label>
+        <textarea class="form-control {% if errors.description %}is-invalid{% endif %}" id="description" name="description"
+                  rows="3" minlength="{{ config.DESCRIPTION_MIN }}" maxlength="{{ config.DESCRIPTION_MAX }}" required
+                  aria-describedby="desc-help description-error">{{ form.description or '' }}</textarea>
+        <div id="desc-help" class="form-text">{{ config.DESCRIPTION_MIN }}–{{ config.DESCRIPTION_MAX }} characters. No names, phone numbers or ID numbers. <span id="desc-count" aria-live="polite"></span></div>
+        {{ field_error(errors, 'description') }}
+        <label for="observed_at" class="form-label mt-3">When did you observe it? (IST) *</label>
+        <input type="datetime-local" class="form-control {% if errors.observed_at %}is-invalid{% endif %}" id="observed_at"
+               name="observed_at" value="{{ form.observed_at or '' }}" required aria-describedby="observed_at-error">
+        {{ field_error(errors, 'observed_at') }}
+      </fieldset>
+
+      <fieldset class="mb-3">
+        <legend class="h5">3. Category</legend>
+        <div class="card mb-2"><div class="card-body small">
+          <div class="mb-2"><strong>Image AI:</strong>
+            {% if detector.available %}
+              <span class="badge text-bg-success">Available</span>
+            {% else %}
+              <span class="badge text-bg-secondary">AI unavailable</span> {{ detector.reason }}
+            {% endif %}
+          </div>
+          <div><strong>Text suggestion (keyword rule, not AI):</strong>
+            <span id="text-suggestion" aria-live="polite" class="text-muted">Type a description to see a suggestion.</span>
+          </div>
+        </div></div>
+        <label for="category" class="form-label">Category (your choice is what gets submitted) *</label>
+        <select class="form-select {% if errors.category %}is-invalid{% endif %}" id="category" name="category" required aria-describedby="category-error">
+          <option value="">Choose…</option>
+          {% for key, name in CATEGORIES.items() %}
+            <option value="{{ key }}" {% if form.category == key %}selected{% endif %}>{{ name }}</option>
+          {% endfor %}
+        </select>
+        {{ field_error(errors, 'category') }}
+        <div class="form-text">Waterlogging and streetlight issues are always chosen manually. If the photo shows more than one issue, pick the main one and mention the rest in the description.</div>
+      </fieldset>
+    </div>
+
+    <div class="col-lg-6">
+      <fieldset class="mb-3">
+        <legend class="h5">4. Location *</legend>
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <button type="button" class="btn btn-outline-primary btn-sm" id="use-location">Use my location</button>
+          <span class="small text-muted align-self-center">Or click / tap the map to place or move the pin.</span>
+        </div>
+        <div id="geo-status" class="small mb-2" aria-live="polite"></div>
+        <div id="map" class="map-box" role="application" aria-label="Map for choosing the issue location"
+             data-center-lat="{{ config.MAP_DEFAULT_CENTER[0] }}" data-center-lon="{{ config.MAP_DEFAULT_CENTER[1] }}"
+             data-zoom="{{ config.MAP_DEFAULT_ZOOM }}" data-tiles="{{ config.MAP_TILE_URL }}"
+             data-attribution="{{ config.MAP_TILE_ATTRIBUTION }}"></div>
+        <div class="row g-2 mt-2">
+          <div class="col-6">
+            <label for="latitude" class="form-label small">Latitude</label>
+            <input type="text" inputmode="decimal" class="form-control form-control-sm {% if errors.location %}is-invalid{% endif %}" id="latitude" name="latitude" value="{{ form.latitude or '' }}" aria-describedby="location-error">
+          </div>
+          <div class="col-6">
+            <label for="longitude" class="form-label small">Longitude</label>
+            <input type="text" inputmode="decimal" class="form-control form-control-sm {% if errors.location %}is-invalid{% endif %}" id="longitude" name="longitude" value="{{ form.longitude or '' }}">
+          </div>
+        </div>
+        <input type="hidden" id="location_source" name="location_source" value="{{ form.location_source or 'manual' }}">
+        {{ field_error(errors, 'location') }}
+        <label for="landmark" class="form-label mt-3">Nearby landmark (optional)</label>
+        <input type="text" class="form-control {% if errors.landmark %}is-invalid{% endif %}" id="landmark" name="landmark"
+               maxlength="{{ config.LANDMARK_MAX }}" value="{{ form.landmark or '' }}" placeholder="e.g. near the bus stop" aria-describedby="landmark-error">
+        {{ field_error(errors, 'landmark') }}
+      </fieldset>
+
+      <div class="card mb-3"><div class="card-body small" aria-live="polite">
+        <h2 class="h6">Possible existing reports nearby</h2>
+        <div id="nearby">Set a location to check for reports within {{ config.DUPLICATE_RADIUS_M }} m in the last {{ config.DUPLICATE_WINDOW_DAYS }} days.</div>
+        <div class="text-muted mt-1">You can still submit. A reviewer decides whether reports describe the same issue.</div>
+      </div></div>
+
+      <fieldset class="mb-3">
+        <legend class="h5">5. Consent *</legend>
+        <div class="form-check">
+          <input class="form-check-input {% if errors.consent %}is-invalid{% endif %}" type="checkbox" id="consent" name="consent" value="1" {% if form.consent %}checked{% endif %} aria-describedby="consent-error">
+          <label class="form-check-label small" for="consent">
+            I took these photos or may share them, tried to avoid identifiable people and number plates, and agree to the
+            <a href="{{ url_for('public.privacy') }}#consent" target="_blank">consent statement</a>. I understand this is an academic prototype, not an emergency or official service.
+          </label>
+          {{ field_error(errors, 'consent') }}
+        </div>
+      </fieldset>
+      <button class="btn btn-primary btn-lg w-100" type="submit">Submit complaint</button>
+    </div>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="{{ url_for('static', filename='js/complaint_form.js') }}"></script>
+{% endblock %}

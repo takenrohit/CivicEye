@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, demo_badge with context %}
+{% block title %}My dashboard{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+  <h1 class="h3 mb-0">Hello, {{ current_user.display_name }}</h1>
+  <a class="btn btn-primary" href="{{ url_for('citizen.new_complaint') }}">Report an issue</a>
+</div>
+<div class="row g-3 mb-4">
+  {% for key, title in [('total','My reports'),('open','Open'),('resolved','Marked resolved')] %}
+  <div class="col-sm-4"><div class="card stat-card"><div class="card-body">
+    <div class="text-muted small">{{ title }}</div><div class="display-6">{{ counts[key] }}</div>
+  </div></div></div>
+  {% endfor %}
+</div>
+<h2 class="h5">Recent reports</h2>
+{% if recent %}
+<div class="list-group">
+  {% for c in recent %}
+  <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center flex-wrap gap-2"
+     href="{{ url_for('citizen.complaint_detail', public_id=c.public_id) }}">
+    <span><code>{{ c.public_id }}</code> · {{ category_label(c.effective_category) }} {{ demo_badge(c) }}<br>
+      <small class="text-muted">{{ c.created_at|local }}</small></span>
+    {{ status_badge(c.status) }}
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<p class="text-muted">You have not reported anything yet.</p>
+{% endif %}
+{% endblock %}
