@@ -29,12 +29,17 @@ class Config:
 
     # File storage (outside static/, served only through authorised routes)
     UPLOAD_DIR = os.environ.get("CIVICEYE_UPLOAD_DIR", str(BASE_DIR / "instance" / "uploads"))
-    MAX_CONTENT_LENGTH = _int("CIVICEYE_MAX_REQUEST_MB", 40) * 1024 * 1024
-    MAX_IMAGE_BYTES = _int("CIVICEYE_MAX_IMAGE_MB", 8) * 1024 * 1024
-    MAX_IMAGE_PIXELS = 40_000_000
+    # Phone photos are often 5-15 MB (12-108 MP). JPEGs are decoded at reduced
+    # scale and every stored image is downscaled to STORE_MAX_SIDE on its long side.
+    MAX_CONTENT_LENGTH = _int("CIVICEYE_MAX_REQUEST_MB", 90) * 1024 * 1024
+    MAX_IMAGE_BYTES = _int("CIVICEYE_MAX_IMAGE_MB", 20) * 1024 * 1024
+    MAX_IMAGE_PIXELS = 200_000_000  # header check (decompression-bomb guard)
+    MAX_NON_JPEG_PIXELS = 50_000_000  # PNG/WebP cannot be decoded at reduced scale
     MIN_IMAGE_SIDE = 64
-    MAX_IMAGE_SIDE = 10_000
+    MAX_IMAGE_SIDE = 16_000
+    STORE_MAX_SIDE = _int("CIVICEYE_STORE_MAX_SIDE", 2560)
     MAX_EXTRA_IMAGES = _int("CIVICEYE_MAX_EXTRA_IMAGES", 3)
+    MAX_CLARIFICATION_IMAGES = _int("CIVICEYE_MAX_CLARIFICATION_IMAGES", 3)
 
     DESCRIPTION_MIN = 10
     DESCRIPTION_MAX = 1000
@@ -55,7 +60,8 @@ class Config:
     RATELIMIT_STORAGE_URI = os.environ.get("CIVICEYE_RATELIMIT_STORAGE", "memory://")
     LOGIN_RATE_LIMIT = "10 per minute"
     REGISTER_RATE_LIMIT = "5 per minute"
-    SUBMIT_RATE_LIMIT = "10 per hour"
+    SUBMIT_RATE_LIMIT = "10 per hour"  # accepted complaints
+    SUBMIT_ATTEMPT_RATE_LIMIT = "30 per hour"  # all POSTs, including failed validation
 
     DISPLAY_TZ = "Asia/Kolkata"
 
