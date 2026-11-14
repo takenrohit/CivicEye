@@ -9,7 +9,7 @@ Legend: **COMPLETE** · **PARTIAL** · **BLOCKED** · **NOT STARTED**. Last upda
 | 1. Base | App factory, auth/roles, complaint workflow, review, priority, nearby lookup, map, dashboard, CSV, demo seed, tests, docs | COMPLETE |
 | 2. Image AI + duplicates | PyTorch/YOLO inference backend, RDD2022/TACO preparation, training/evaluation scripts, model card; duplicate candidates, linking/unlinking, incident groups, corroboration (C) | NOT STARTED |
 | 3. Traffic video | Upload, ROI + counting line, detection + tracking, directional counts, persistent job queue + worker, charts/CSV, manual-reference evaluation | NOT STARTED |
-| 4. Hardening + academic docs | Text TF-IDF model (only if real labelled data exists), heatmap, CSP, browser tests, academic documentation drafts, performance measurements | NOT STARTED |
+| 4. Hardening + academic docs | Text TF-IDF model (only if real labelled data exists), heatmap, CSP, phone and accessibility tests, academic documentation drafts, performance measurements | NOT STARTED |
 
 ## Detailed checklist
 
@@ -39,13 +39,13 @@ Legend: **COMPLETE** · **PARTIAL** · **BLOCKED** · **NOT STARTED**. Last upda
 | Safe, authorised CSV export | COMPLETE | |
 | Admin: reviewers, departments + category mapping, feedback, audit log | COMPLETE | |
 | Demo seed / purge commands, DEMO labels in UI and CSV | COMPLETE | |
-| Upload validation, EXIF removal, random names, authorised media route, path-traversal guard | COMPLETE | |
+| Upload validation, EXIF removal, random names, authorised media route, path-traversal guard | COMPLETE | Phone photos up to 20 MB; stored copy downscaled to 2560 px |
 | Image AI module interface | PARTIAL | Interface + honest unavailable backend only |
 | Pothole/litter trained model, dataset prep, training, evaluation, model card | NOT STARTED | Phase 2 |
 | Text TF-IDF + logistic regression | NOT STARTED | Needs a genuine labelled dataset; keyword baseline used |
 | Duplicate candidates with image/text similarity, linking, unlinking, incident groups, test pairs | PARTIAL | Haversine nearby lookup only |
 | Traffic-video module and worker | NOT STARTED | Phase 3 |
-| Automated tests | PARTIAL | 57 tests for phase 1 scope; no browser tests |
+| Automated tests | PARTIAL | 73 pytest tests + 36-check real-browser script (`scripts/browser_smoke.py`) for phase 1 scope; no phone or accessibility tests |
 | README, architecture + ER diagram, routes, privacy notes, test report | COMPLETE | For phase 1 |
 | Model card, dataset notes | NOT STARTED | Phase 2 |
 | Academic documentation drafts | NOT STARTED | Phase 4 |

@@ -52,6 +52,7 @@ Other commands:
 .\.venv\Scripts\flask --app wsgi create-reviewer     # simulated reviewer account
 .\.venv\Scripts\flask --app wsgi purge-demo          # deletes ONLY records flagged as demo
 .\.venv\Scripts\python -m pytest -q                  # run tests
+.\.venv\Scripts\python scripts\browser_smoke.py      # real-browser checkup (server must be running; uses installed Edge)
 ```
 
 Phase 1 has no background worker. The traffic-video worker arrives in phase 3.
@@ -102,4 +103,7 @@ MANUAL_WORK.md       tasks the team must do outside the software
 - Map tiles say "Access blocked": OpenStreetMap rejects tile requests that carry no `Referer`. The app sends `Referrer-Policy: strict-origin-when-cross-origin` for this reason; do not change it to `no-referrer` or `same-origin`. Browser extensions that strip referrers cause the same problem. Hard-refresh (Ctrl+F5) after fixing.
 - "Use my location" does nothing: browsers allow geolocation only on `localhost`/HTTPS and after permission. Click the map instead.
 - `400 Bad request` after leaving a form open for hours: the CSRF token expired (4 h). Reload the page.
-- `429 Too many requests`: login (10/min), registration (5/min) and submission (10/hour) are rate-limited.
+- Map still blocked after a fix or after uploading: the browser cached the blocked tiles. Clear cached images (Edge/Chrome: Ctrl+Shift+Delete, "Cached images and files") or open a private window.
+- Lost the demo passwords: run `seed-demo --count 1` again; it prints new passwords for all demo accounts.
+- A phone photo is rejected: the limit is 20 MB per photo (`CIVICEYE_MAX_IMAGE_MB`). Stored copies are downscaled to 2560 px.
+- `429 Too many requests`: login (10/min), registration (5/min) and submission (10 accepted complaints and 30 attempts per hour) are rate-limited.

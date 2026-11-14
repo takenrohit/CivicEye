@@ -7,11 +7,11 @@
 | Passwords | Werkzeug `generate_password_hash` (scrypt); min 10 chars; never logged |
 | Sessions | Flask-Login, `session_protection="strong"`, HttpOnly + SameSite=Lax cookies; `CIVICEYE_SECURE_COOKIES=1` for HTTPS |
 | CSRF | Flask-WTF `CSRFProtect` on every POST, including logout and JSON API (header `X-CSRFToken`) |
-| Rate limits | Flask-Limiter: login 10/min, register 5/min, complaint submit 10/hour, API 60/min (in-memory store; use Redis for multi-process) |
+| Rate limits | Flask-Limiter: login 10/min, register 5/min, complaint submit 10 accepted/hour plus 30 attempts/hour, API 60/min (in-memory store; use Redis for multi-process) |
 | Secrets | `CIVICEYE_SECRET_KEY` from environment; app refuses to start without it; `.env` is git-ignored |
 | Access control | Role decorator on every protected route; citizens get 404 for others' complaints; reviewer object-level check |
 | IDs | Complaint IDs `CE-` + 12 random chars; attachment IDs 128-bit random |
-| Uploads | Decoded with Pillow; only JPEG/PNG/WebP; size, pixel-count and dimension limits; re-encoded (drops EXIF incl. GPS and trailing payloads); random filenames; stored outside `static/`; served only via an authorised route with `Cache-Control: no-store`; path-traversal guard |
+| Uploads | Decoded with Pillow; only JPEG/PNG/WebP; 20 MB, pixel-count and dimension limits (JPEG decoded at reduced scale, PNG/WebP capped at 50 MP); downscaled to 2560 px and re-encoded (drops EXIF incl. GPS and trailing payloads); random filenames; stored outside `static/`; served only via an authorised route with `Cache-Control: no-store`; path-traversal guard |
 | Output | Jinja autoescaping; JS builds DOM with `textContent`; JSON passed through `tojson` |
 | CSV | Cells starting with `= + - @ TAB CR` are prefixed with `'`; reporter identities excluded; coordinates rounded to 4 dp; each export audited |
 | Headers | `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin` (other sites see only the origin, never paths containing complaint IDs; OSM tile servers reject requests without a Referer), `Permissions-Policy` |
