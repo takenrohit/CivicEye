@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf, field_error with context %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<h1 class="h3">Users</h1>
+<div class="row g-4">
+  <div class="col-lg-8">
+    <div class="table-responsive">
+    <table class="table table-sm align-middle">
+      <thead><tr><th scope="col">Name</th><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Department</th><th scope="col">Status</th><th scope="col"><span class="visually-hidden">Actions</span></th></tr></thead>
+      <tbody>
+      {% for u in users %}
+      <tr>
+        <td>{{ u.display_name }} {% if u.is_demo %}<span class="badge bg-warning text-dark">DEMO</span>{% endif %}</td>
+        <td class="small">{{ u.email }}</td>
+        <td>{{ u.role }}{% if u.is_staff %} <small class="text-muted">(simulated)</small>{% endif %}</td>
+        <td class="small">{{ u.department.name if u.department else '—' }}</td>
+        <td>{{ 'Active' if u.is_active_account else 'Deactivated' }}</td>
+        <td>{% if u.id != current_user.id %}
+          <form method="post">{{ csrf() }}<input type="hidden" name="action" value="toggle"><input type="hidden" name="user_id" value="{{ u.id }}">
+            <button class="btn btn-sm btn-outline-secondary" type="submit">{{ 'Deactivate' if u.is_active_account else 'Activate' }}<span class="visually-hidden"> {{ u.email }}</span></button></form>
+        {% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card"><div class="card-body">
+      <h2 class="h6">Create reviewer account</h2>
+      <p class="small text-muted">Reviewer accounts are simulated project roles unless genuine authorised participation is arranged. Administrators are created only with the <code>flask create-admin</code> command.</p>
+      <form method="post" novalidate>
+        {{ csrf() }}<input type="hidden" name="action" value="create">
+        <label class="form-label small" for="email">Email</label>
+        <input id="email" name="email" type="email" class="form-control form-control-sm {% if errors.email %}is-invalid{% endif %}">{{ field_error(errors, 'email') }}
+        <label class="form-label small mt-2" for="display_name">Display name</label>
+        <input id="display_name" name="display_name" class="form-control form-control-sm {% if errors.display_name %}is-invalid{% endif %}">{{ field_error(errors, 'display_name') }}
+        <label class="form-label small mt-2" for="password">Initial password (share privately)</label>
+        <input id="password" name="password" type="password" autocomplete="new-password" class="form-control form-control-sm {% if errors.password %}is-invalid{% endif %}">{{ field_error(errors, 'password') }}
+        <label class="form-label small mt-2" for="department_id">Department</label>
+        <select id="department_id" name="department_id" class="form-select form-select-sm"><option value="">None</option>
+          {% for d in departments %}<option value="{{ d.id }}">{{ d.name }}</option>{% endfor %}</select>
+        <button class="btn btn-sm btn-primary mt-3" type="submit">Create reviewer</button>
+      </form>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

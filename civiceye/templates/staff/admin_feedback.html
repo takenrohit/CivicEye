@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Feedback{% endblock %}
+{% block content %}
+<h1 class="h3">Application feedback</h1>
+<p class="small text-muted">Real feedback submitted through the app. This is not a structured survey and must not be reported as survey results.</p>
+{% if items %}
+<table class="table table-sm">
+  <thead><tr><th scope="col">When</th><th scope="col">From</th><th scope="col">Rating</th><th scope="col">Message</th></tr></thead>
+  <tbody>{% for f in items %}<tr><td class="small text-nowrap">{{ f.created_at|local }}</td><td class="small">{{ f.user.display_name }}{% if f.user.is_demo %} (DEMO){% endif %}</td><td>{{ f.rating or '—' }}</td><td>{{ f.message }}</td></tr>{% endfor %}</tbody>
+</table>
+{% else %}<p class="text-muted">No feedback yet.</p>{% endif %}
+{% endblock %}

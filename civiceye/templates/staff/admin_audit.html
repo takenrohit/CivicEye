@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Audit log{% endblock %}
+{% block content %}
+<h1 class="h3">Audit log</h1>
+<p class="small text-muted">System events (most recent 300). Complaint-level changes are in each complaint's history.</p>
+<table class="table table-sm">
+  <thead><tr><th scope="col">When</th><th scope="col">Actor</th><th scope="col">Action</th><th scope="col">Target</th><th scope="col">Details</th></tr></thead>
+  <tbody>{% for e in items %}<tr><td class="small text-nowrap">{{ e.created_at|local }}</td><td class="small">{{ e.actor.email if e.actor else 'CLI/system' }}</td><td><code>{{ e.action }}</code></td><td class="small">{{ e.target or '' }}</td><td class="small"><code>{{ e.details|tojson if e.details else '' }}</code></td></tr>
+  {% else %}<tr><td colspan="5" class="text-muted">No events.</td></tr>{% endfor %}</tbody>
+</table>
+{% endblock %}
