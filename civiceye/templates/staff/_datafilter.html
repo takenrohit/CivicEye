@@ -1,0 +1,6 @@
+<div class="btn-group btn-group-sm mb-3" role="group" aria-label="Data source">
+  {% for key, name in [('all','All data'),('real','Pilot data only'),('demo','Demo data only')] %}
+  <a class="btn btn-outline-secondary {% if data == key %}active{% endif %}" {% if data == key %}aria-current="true"{% endif %}
+     href="?data={{ key }}">{{ name }}</a>
+  {% endfor %}
+</div>

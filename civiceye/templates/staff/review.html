@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, demo_badge, csrf, band_badge, priority_table with context %}
+{% block title %}Review {{ c.public_id }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h4 mb-0">Review <code>{{ c.public_id }}</code> {{ demo_badge(c) }}</h1>
+  <div>{{ status_badge(c.status) }} {{ band_badge(pr) }}</div>
+</div>
+{% if not can_act %}<div class="alert alert-secondary small">This complaint is assigned to another reviewer/department. You can view it and add internal notes only.</div>{% endif %}
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="row g-2 mb-3">
+      {% for a in c.attachments %}
+      <div class="col-{{ '12' if loop.first else '6' }}">
+        <figure class="mb-0">
+          <img src="{{ url_for('media.attachment', public_id=a.public_id) }}" class="img-fluid rounded evidence-img w-100" alt="{{ a.kind|capitalize }} photo {{ loop.index }}">
+          <figcaption class="small text-muted">{{ a.kind|capitalize }} · {{ a.width }}×{{ a.height }} · {{ a.created_at|local }}</figcaption>
+        </figure>
+      </div>
+      {% endfor %}
+    </div>
+    <dl class="row small">
+      <dt class="col-sm-4">Reporter</dt><dd class="col-sm-8">{{ c.reporter.display_name }} {% if c.reporter.is_demo %}<span class="badge bg-warning text-dark">DEMO</span>{% endif %}</dd>
+      <dt class="col-sm-4">Description</dt><dd class="col-sm-8">{{ c.description }}</dd>
+      <dt class="col-sm-4">Observed / submitted</dt><dd class="col-sm-8">{{ c.observed_at|local }} / {{ c.created_at|local }}</dd>
+      <dt class="col-sm-4">Location</dt><dd class="col-sm-8">{{ '%.6f'|format(c.latitude) }}, {{ '%.6f'|format(c.longitude) }} ({{ c.location_source }}){% if c.landmark %} · {{ c.landmark }}{% endif %}</dd>
+      <dt class="col-sm-4">Citizen category</dt><dd class="col-sm-8">{{ category_label(c.submitted_category) }}</dd>
+      <dt class="col-sm-4">Reviewed category</dt><dd class="col-sm-8">{{ category_label(c.reviewed_category) if c.reviewed_category else 'Not reviewed' }}</dd>
+      <dt class="col-sm-4">Department / assignee</dt><dd class="col-sm-8">{{ c.department.name if c.department else '—' }} / {{ c.assigned_to.display_name if c.assigned_to else 'Unassigned' }}</dd>
+    </dl>
+    <div id="map" class="map-box mb-3" data-lat="{{ c.latitude }}" data-lon="{{ c.longitude }}" data-radius="{{ cfg.DUPLICATE_RADIUS_M }}"
+         data-tiles="{{ cfg.MAP_TILE_URL }}" data-attribution="{{ cfg.MAP_TILE_ATTRIBUTION }}" role="img" aria-label="Map showing the complaint location and the {{ cfg.DUPLICATE_RADIUS_M }} m nearby radius"></div>
+
+    <div class="card mb-3"><div class="card-body small">
+      <h2 class="h6">Automated suggestions (original outputs, stored separately)</h2>
+      {% for inf in c.inferences %}
+        <div class="mb-2">
+          <strong>{{ 'Image' if inf.kind == 'image' else 'Text' }}</strong> · method <code>{{ inf.method }}</code>{% if inf.model_id %} · <code>{{ inf.model_id }}</code>{% endif %} ·
+          {% if inf.status == 'unavailable' %}<span class="badge text-bg-secondary">AI unavailable</span> {{ inf.output_json.message }}
+          {% elif inf.kind == 'text' %}
+            {% if inf.output_json.category %}suggested <strong>{{ category_label(inf.output_json.category) }}</strong> (keyword score {{ inf.output_json.score }}, not a probability; matched: {{ inf.output_json.matched|join(', ') }})
+              {% if inf.output_json.category != c.submitted_category %}<span class="badge text-bg-warning">Differs from citizen choice: needs review</span>{% endif %}
+            {% else %}no clear keyword suggestion{% endif %}
+          {% else %}{{ inf.status }}{% endif %}
+        </div>
+      {% else %}<p class="mb-0 text-muted">No automated outputs recorded.</p>{% endfor %}
+    </div></div>
+
+    <div class="card mb-3"><div class="card-body small">
+      <h2 class="h6">Nearby reports (≤ {{ cfg.DUPLICATE_RADIUS_M }} m, last {{ cfg.DUPLICATE_WINDOW_DAYS }} days)</h2>
+      <p class="text-muted">Proximity alone is not proof of a duplicate. Linking and incident groups arrive in phase 2; nothing is merged automatically.</p>
+      {% if nearby %}
+      <ul class="mb-0">{% for n in nearby %}
+        <li><a href="{{ url_for('staff.review', public_id=n.complaint.public_id) }}"><code>{{ n.complaint.public_id }}</code></a>
+          · {{ n.distance_m }} m · {{ category_label(n.complaint.effective_category) }}{% if not n.same_category %} (different category){% endif %}
+          · {{ STATUS_LABELS[n.complaint.status] }}{% if n.same_reporter %} · <strong>same reporter</strong> (not independent corroboration){% endif %}</li>
+      {% endfor %}</ul>
+      {% else %}<p class="mb-0">None found.</p>{% endif %}
+    </div></div>
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card mb-3"><div class="card-body">
+      <h2 class="h6">Priority breakdown</h2>
+      {{ priority_table(pr) }}
+      {% if c.priority_override_reason %}<p class="small mt-2 mb-0">Override reason: {{ c.priority_override_reason }}</p>{% endif %}
+    </div></div>
+
+    {% if can_act %}
+    <div class="accordion mb-3" id="actions">
+      <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#a-status" aria-expanded="true">Change status</button></h2>
+        <div id="a-status" class="accordion-collapse collapse show"><div class="accordion-body">
+          {% if next_statuses %}
+          <form method="post" enctype="multipart/form-data" action="{{ url_for('staff.set_status', public_id=c.public_id) }}">
+            {{ csrf() }}
+            <label class="form-label small" for="status">New status (allowed from {{ STATUS_LABELS[c.status] }})</label>
+            <select id="status" name="status" class="form-select form-select-sm mb-2">
+              {% for s in next_statuses %}<option value="{{ s }}">{{ STATUS_LABELS[s] }}</option>{% endfor %}
+            </select>
+            <label class="form-label small" for="public_note">Note visible to citizen (required for Rejected and Resolved)</label>
+            <textarea id="public_note" name="public_note" class="form-control form-control-sm mb-2" rows="2"></textarea>
+            <label class="form-label small" for="internal_note">Internal note (staff only)</label>
+            <textarea id="internal_note" name="internal_note" class="form-control form-control-sm mb-2" rows="2"></textarea>
+            <label class="form-label small" for="resolution_image">Resolution evidence photo (used only when resolving; optional)</label>
+            <input id="resolution_image" type="file" name="resolution_image" class="form-control form-control-sm mb-2" accept="image/jpeg,image/png,image/webp">
+            <button class="btn btn-sm btn-primary" type="submit">Apply</button>
+          </form>
+          {% else %}<p class="small mb-0">No further transitions from {{ STATUS_LABELS[c.status] }}.{% if c.status == 'resolved' %} Reopening happens only through an approved citizen request.{% endif %}</p>{% endif %}
+        </div></div>
+      </div>
+      <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a-cat">Confirm category</button></h2>
+        <div id="a-cat" class="accordion-collapse collapse"><div class="accordion-body">
+          <form method="post" action="{{ url_for('staff.set_category', public_id=c.public_id) }}">
+            {{ csrf() }}
+            <label class="form-label small" for="rc">Reviewed category</label>
+            <select id="rc" name="category" class="form-select form-select-sm mb-2">
+              {% for k, n in CATEGORIES.items() %}<option value="{{ k }}" {% if k == c.effective_category %}selected{% endif %}>{{ n }}</option>{% endfor %}
+            </select>
+            <label class="form-label small" for="rc-note">Internal note</label>
+            <input id="rc-note" name="internal_note" class="form-control form-control-sm mb-2">
+            <button class="btn btn-sm btn-primary" type="submit">Save category</button>
+          </form>
+        </div></div>
+      </div>
+      <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a-risk">Review risk &amp; location context</button></h2>
+        <div id="a-risk" class="accordion-collapse collapse"><div class="accordion-body">
+          <form method="post" action="{{ url_for('staff.set_risk', public_id=c.public_id) }}">
+            {{ csrf() }}
+            <label class="form-label small" for="risk">Human-reviewed safety risk (R)</label>
+            <select id="risk" name="reviewed_risk" class="form-select form-select-sm mb-2">
+              <option value="">Unknown / not reviewed</option>
+              {% for k, n in risk_labels.items() %}<option value="{{ k }}" {% if c.reviewed_risk == k %}selected{% endif %}>{{ n }}</option>{% endfor %}
+            </select>
+            <div class="form-text mb-2">Judge from what is visible and reported. Do not infer depth or size from an uncalibrated photo. Never use model confidence as risk.</div>
+            <label class="form-label small" for="loc">Location sensitivity (L)</label>
+            <select id="loc" name="location_sensitivity" class="form-select form-select-sm mb-2">
+              <option value="unknown">Unknown / not reviewed</option>
+              {% for k, n in location_labels.items() %}<option value="{{ k }}" {% if c.location_sensitivity == k %}selected{% endif %}>{{ n }}</option>{% endfor %}
+            </select>
+            <label class="form-label small" for="loc-r">Rationale (required if L &gt; 0; no automatic school/hospital data is used)</label>
+            <input id="loc-r" name="location_rationale" maxlength="255" value="{{ c.location_rationale or '' }}" class="form-control form-control-sm mb-2">
+            <label class="form-label small" for="risk-note">Internal note</label>
+            <input id="risk-note" name="internal_note" class="form-control form-control-sm mb-2">
+            <button class="btn btn-sm btn-primary" type="submit">Save</button>
+          </form>
+        </div></div>
+      </div>
+      <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a-assign">Assignment</button></h2>
+        <div id="a-assign" class="accordion-collapse collapse"><div class="accordion-body">
+          <form method="post" action="{{ url_for('staff.assign', public_id=c.public_id) }}">
+            {{ csrf() }}
+            <label class="form-label small" for="dep">Department (simulated)</label>
+            <select id="dep" name="department_id" class="form-select form-select-sm mb-2">
+              <option value="">Choose…</option>
+              {% for d in departments %}<option value="{{ d.id }}" {% if d.id == suggested_dep %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+            </select>
+            <label class="form-label small" for="assignee">Reviewer (optional)</label>
+            <select id="assignee" name="assignee_id" class="form-select form-select-sm mb-2">
+              <option value="">Unassigned</option>
+              {% for u in reviewers %}<option value="{{ u.id }}" {% if c.assigned_to_id == u.id %}selected{% endif %}>{{ u.display_name }} ({{ u.role }})</option>{% endfor %}
+            </select>
+            <button class="btn btn-sm btn-primary" type="submit">Save assignment</button>
+          </form>
+        </div></div>
+      </div>
+      <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#a-ovr">Priority override</button></h2>
+        <div id="a-ovr" class="accordion-collapse collapse"><div class="accordion-body">
+          <form method="post" action="{{ url_for('staff.set_override', public_id=c.public_id) }}">
+            {{ csrf() }}
+            <label class="form-label small" for="ovr">Override value (0–1)</label>
+            <input id="ovr" type="number" step="0.01" min="0" max="1" name="value" value="{{ c.priority_override or '' }}" class="form-control form-control-sm mb-2">
+            <label class="form-label small" for="ovr-r">Reason (required)</label>
+            <input id="ovr-r" name="reason" required maxlength="255" class="form-control form-control-sm mb-2">
+            <button class="btn btn-sm btn-primary" type="submit">Apply override</button>
+            {% if c.priority_override is not none %}<button class="btn btn-sm btn-outline-secondary" type="submit" name="clear" value="1">Clear override</button>{% endif %}
+          </form>
+        </div></div>
+      </div>
+    </div>
+    {% endif %}
+
+    {% for r in reopen_reqs if r.state == 'pending' %}
+    <div class="card border-danger mb-3"><div class="card-body small">
+      <h2 class="h6">Pending reopening request</h2>
+      <p>{{ r.reason }} <span class="text-muted">({{ r.created_at|local }})</span></p>
+      {% if can_act %}
+      <form method="post" action="{{ url_for('staff.decide_reopen', req_id=r.id) }}">
+        {{ csrf() }}<input type="hidden" name="back" value="review">
+        <label class="form-label small" for="rn{{ r.id }}">Decision note (required to decline)</label>
+        <input id="rn{{ r.id }}" name="note" class="form-control form-control-sm mb-2">
+        <button class="btn btn-sm btn-danger" name="decision" value="approve" type="submit">Approve: reopen</button>
+        <button class="btn btn-sm btn-outline-secondary" name="decision" value="decline" type="submit">Decline</button>
+      </form>
+      {% endif %}
+    </div></div>
+    {% endfor %}
+
+    <div class="card mb-3"><div class="card-body">
+      <h2 class="h6">Add note</h2>
+      <form method="post" action="{{ url_for('staff.add_note', public_id=c.public_id) }}">
+        {{ csrf() }}
+        <label class="visually-hidden" for="note">Note</label>
+        <textarea id="note" name="note" class="form-control form-control-sm mb-2" rows="2"></textarea>
+        <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="visibility" id="v-int" value="internal" checked><label class="form-check-label small" for="v-int">Internal (staff only)</label></div>
+        <div class="form-check form-check-inline"><input class="form-check-input" type="radio" name="visibility" id="v-pub" value="public" {% if not can_act %}disabled{% endif %}><label class="form-check-label small" for="v-pub">Visible to citizen</label></div>
+        <button class="btn btn-sm btn-outline-primary" type="submit">Add</button>
+      </form>
+    </div></div>
+
+    <h2 class="h6">Full history (including internal notes)</h2>
+    {% set history = c.history %}{% set show_internal = true %}
+    {% include "_history.html" %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="{{ url_for('static', filename='js/review_map.js') }}"></script>
+{% endblock %}

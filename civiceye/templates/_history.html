@@ -1,0 +1,24 @@
+{# Expects: history (list of StatusEvent), show_internal (bool) #}
+<ol class="timeline">
+{% for e in history %}
+  {% if show_internal or e.public_note or e.event_type == 'status' %}
+  <li>
+    <div class="small text-muted">{{ e.created_at|local }} ·
+      {% if not e.actor %}System
+      {% elif show_internal %}{{ e.actor.display_name }}{% if e.actor.is_staff %} ({{ e.actor.role }}){% endif %}
+      {% elif e.actor.is_staff %}Project reviewer
+      {% else %}You{% endif %}</div>
+    <div>
+      {% if e.event_type == 'status' %}
+        <strong>{% if e.from_status %}{{ STATUS_LABELS[e.from_status] }} → {% endif %}{{ STATUS_LABELS[e.to_status] }}</strong>
+      {% else %}
+        <strong>{{ e.event_type|replace('_', ' ')|capitalize }}</strong>
+      {% endif %}
+    </div>
+    {% if e.public_note %}<div>{{ e.public_note }}</div>{% endif %}
+    {% if show_internal and e.internal_note %}<div class="small border-start border-3 border-warning ps-2 mt-1"><span class="badge text-bg-warning">Internal</span> {{ e.internal_note }}</div>{% endif %}
+    {% if show_internal and e.details %}<details class="small"><summary>Details</summary><code>{{ e.details|tojson }}</code></details>{% endif %}
+  </li>
+  {% endif %}
+{% endfor %}
+</ol>

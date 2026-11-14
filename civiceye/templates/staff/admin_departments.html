@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf with context %}
+{% block title %}Departments{% endblock %}
+{% block content %}
+<h1 class="h3">Departments and category mapping</h1>
+<p class="small text-muted">These are simulated project departments. They do not represent real municipal (BBMP/GBA) departments unless an official partnership is arranged.</p>
+<div class="row g-4">
+  <div class="col-lg-6">
+    <form method="post" class="card"><div class="card-body">
+      {{ csrf() }}<input type="hidden" name="action" value="map">
+      <h2 class="h6">Default department per category</h2>
+      {% for k, n in CATEGORIES.items() %}
+      <label class="form-label small" for="map_{{ k }}">{{ n }}</label>
+      <select id="map_{{ k }}" name="map_{{ k }}" class="form-select form-select-sm mb-2">
+        <option value="">None</option>
+        {% for d in departments %}<option value="{{ d.id }}" {% if mapping.get(k) == d.id %}selected{% endif %}>{{ d.name }}</option>{% endfor %}
+      </select>
+      {% endfor %}
+      <button class="btn btn-sm btn-primary" type="submit">Save mapping</button>
+    </div></form>
+  </div>
+  <div class="col-lg-6">
+    <div class="card"><div class="card-body">
+      <h2 class="h6">Departments</h2>
+      <ul class="small">{% for d in departments %}<li>{{ d.name }}{% if d.is_simulated %} <span class="badge text-bg-light border">simulated</span>{% endif %}</li>{% else %}<li class="text-muted">None. Run <code>flask --app wsgi init-departments</code>.</li>{% endfor %}</ul>
+      <form method="post" class="d-flex gap-2">
+        {{ csrf() }}<input type="hidden" name="action" value="add">
+        <label class="visually-hidden" for="dname">New department name</label>
+        <input id="dname" name="name" class="form-control form-control-sm" placeholder="New department name" maxlength="120">
+        <button class="btn btn-sm btn-outline-primary" type="submit">Add</button>
+      </form>
+    </div></div>
+  </div>
+</div>
+{% endblock %}

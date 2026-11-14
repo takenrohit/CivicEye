@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Error {{ code }}{% endblock %}
+{% block content %}
+<h1 class="h3">{{ {400:'Bad request',403:'Not permitted',404:'Not found',413:'Upload too large',429:'Too many requests',500:'Something went wrong'}[code] }}</h1>
+<p>{% if code == 404 %}The page does not exist or you do not have access to it.
+{% elif code == 403 %}Your account does not have permission for this action.
+{% elif code == 413 %}The uploaded files exceed the allowed size.
+{% elif code == 429 %}Please wait a moment and try again.
+{% elif code == 400 %}The request could not be processed. If you submitted a form, reload the page and try again.
+{% else %}An unexpected error occurred.{% endif %}</p>
+<a href="{{ url_for('public.home') }}">Return home</a>
+{% endblock %}

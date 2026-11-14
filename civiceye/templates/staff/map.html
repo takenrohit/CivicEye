@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Complaint map{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+{% endblock %}
+{% block content %}
+<h1 class="h3">Complaint map (staff only)</h1>
+<p class="small text-muted">Exact locations, visible only to reviewers and administrators. Rejected reports are hidden. Markers show a letter for the category and a ring style for the priority band, so colour is not the only cue.</p>
+{% include "staff/_datafilter.html" %}
+<div id="map" class="map-box-lg" role="application" aria-label="Map of complaint locations"
+     data-center-lat="{{ config.MAP_DEFAULT_CENTER[0] }}" data-center-lon="{{ config.MAP_DEFAULT_CENTER[1] }}"
+     data-zoom="{{ config.MAP_DEFAULT_ZOOM }}" data-tiles="{{ config.MAP_TILE_URL }}" data-attribution="{{ config.MAP_TILE_ATTRIBUTION }}"></div>
+<div class="small mt-2">
+  <strong>Legend:</strong> P = pothole, G = garbage, W = waterlogging, S = streetlight, O = other ·
+  thick solid ring = High, solid = Medium, thin = Low, dashed = provisional (unreviewed).
+</div>
+<p class="small mt-2">{{ points|length }} marker(s). A list view is available on the <a href="{{ url_for('staff.complaints') }}">complaints page</a>.</p>
+<script type="application/json" id="points">{{ points|tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="{{ url_for('static', filename='js/staff_map.js') }}"></script>
+{% endblock %}

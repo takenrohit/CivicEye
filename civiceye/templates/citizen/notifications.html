@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_macros.html" import csrf with context %}
+{% block title %}Notifications{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">Notifications</h1>
+  {% if unread_notifications %}
+  <form method="post">{{ csrf() }}<button class="btn btn-sm btn-outline-secondary" type="submit">Mark all as read</button></form>
+  {% endif %}
+</div>
+<p class="small text-muted">In-app notifications only. Email and SMS are disabled in this build.</p>
+{% if items %}
+<ul class="list-group">
+  {% for n in items %}
+  <li class="list-group-item d-flex justify-content-between align-items-start gap-2 {% if not n.is_read %}fw-semibold{% endif %}">
+    <span>{% if not n.is_read %}<span class="badge text-bg-info me-1">New</span>{% endif %}{{ n.message }}
+      {% if n.complaint %}
+        · <a href="{{ url_for('staff.review', public_id=n.complaint.public_id) if current_user.is_staff else url_for('citizen.complaint_detail', public_id=n.complaint.public_id) }}">Open</a>
+      {% endif %}
+    </span>
+    <small class="text-muted text-nowrap">{{ n.created_at|local }}</small>
+  </li>
+  {% endfor %}
+</ul>
+{% else %}<p class="text-muted">No notifications.</p>{% endif %}
+{% endblock %}

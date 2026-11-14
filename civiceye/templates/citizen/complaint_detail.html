@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "_macros.html" import status_badge, demo_badge, csrf, band_badge, priority_table with context %}
+{% block title %}Complaint {{ c.public_id }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+  <h1 class="h4 mb-0">Complaint <code>{{ c.public_id }}</code> {{ demo_badge(c) }}</h1>
+  <div>{{ status_badge(c.status) }}</div>
+</div>
+<div class="row g-4">
+  <div class="col-lg-6">
+    <div class="row g-2 mb-3">
+      {% for a in c.attachments %}
+      <div class="col-{{ '12' if loop.first else '6' }}">
+        <figure class="mb-0">
+          <img src="{{ url_for('media.attachment', public_id=a.public_id) }}" class="img-fluid rounded evidence-img w-100"
+               alt="{{ a.kind|capitalize }} photo {{ loop.index }} for complaint {{ c.public_id }}">
+          <figcaption class="small text-muted">{{ a.kind|capitalize }} · {{ a.created_at|local }}</figcaption>
+        </figure>
+      </div>
+      {% endfor %}
+    </div>
+    <dl class="row small">
+      <dt class="col-sm-4">Description</dt><dd class="col-sm-8">{{ c.description }}</dd>
+      <dt class="col-sm-4">Observed</dt><dd class="col-sm-8">{{ c.observed_at|local }}</dd>
+      <dt class="col-sm-4">Submitted</dt><dd class="col-sm-8">{{ c.created_at|local }}</dd>
+      <dt class="col-sm-4">Location</dt><dd class="col-sm-8">{{ '%.5f'|format(c.latitude) }}, {{ '%.5f'|format(c.longitude) }} ({{ c.location_source }}){% if c.landmark %}<br>Landmark: {{ c.landmark }}{% endif %}</dd>
+      <dt class="col-sm-4">Your category</dt><dd class="col-sm-8">{{ category_label(c.submitted_category) }}</dd>
+      <dt class="col-sm-4">Reviewed category</dt><dd class="col-sm-8">{{ category_label(c.reviewed_category) if c.reviewed_category else 'Not reviewed yet' }}</dd>
+      {% if c.department %}<dt class="col-sm-4">Routed to</dt><dd class="col-sm-8">{{ c.department.name }}</dd>{% endif %}
+      {% if c.status == 'resolved' %}
+      <dt class="col-sm-4">Resolution</dt><dd class="col-sm-8">{{ c.resolution_note }}<br>
+        {% if not c.attachments|selectattr('kind','equalto','resolution')|list %}<em>Resolution not independently verified.</em>{% endif %}</dd>
+      {% endif %}
+    </dl>
+
+    {% if c.status == 'submitted' %}
+    <form method="post" action="{{ url_for('citizen.correct_category', public_id=c.public_id) }}" class="row g-2 align-items-end mb-3">
+      {{ csrf() }}
+      <div class="col-8">
+        <label for="category" class="form-label small">Correct the category (before review starts)</label>
+        <select id="category" name="category" class="form-select form-select-sm">
+          {% for key, name in CATEGORIES.items() %}<option value="{{ key }}" {% if key == c.submitted_category %}selected{% endif %}>{{ name }}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="col-4"><button class="btn btn-sm btn-outline-primary w-100" type="submit">Update</button></div>
+    </form>
+    {% endif %}
+
+    {% if c.status in open_statuses %}
+    <details class="mb-3">
+      <summary>Add a clarification or extra photo</summary>
+      <form method="post" enctype="multipart/form-data" action="{{ url_for('citizen.clarify', public_id=c.public_id) }}" class="mt-2">
+        {{ csrf() }}
+        <label for="note" class="form-label small">Clarification</label>
+        <textarea id="note" name="note" class="form-control form-control-sm mb-2" rows="2" maxlength="1000"></textarea>
+        <label for="clar-image" class="form-label small">Photo (optional)</label>
+        <input id="clar-image" type="file" name="image" class="form-control form-control-sm mb-2" accept="image/jpeg,image/png,image/webp">
+        <button class="btn btn-sm btn-outline-primary" type="submit">Add</button>
+      </form>
+    </details>
+    {% endif %}
+
+    {% if c.status == 'resolved' %}
+      {% if pending_reopen %}
+        <div class="alert alert-info small">Reopening request pending review (sent {{ pending_reopen.created_at|local }}).</div>
+      {% else %}
+        <a class="btn btn-outline-danger btn-sm" href="{{ url_for('citizen.reopen', public_id=c.public_id) }}">Issue not fixed? Request reopening</a>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="col-lg-6">
+    <div class="card mb-3"><div class="card-body">
+      <h2 class="h6">Priority (decision support) {{ band_badge(pr) }}</h2>
+      {{ priority_table(pr) }}
+    </div></div>
+    <h2 class="h6">History</h2>
+    {% set history = c.history %}{% set show_internal = false %}
+    {% include "_history.html" %}
+  </div>
+</div>
+{% endblock %}

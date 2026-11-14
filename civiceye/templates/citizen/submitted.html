@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Complaint submitted{% endblock %}
+{% block content %}
+<div class="row justify-content-center"><div class="col-lg-7">
+  <div class="card border-success">
+    <div class="card-body">
+      <h1 class="h4"><span aria-hidden="true">✓</span> Complaint submitted</h1>
+      <p>Your complaint ID is <code class="fs-5">{{ c.public_id }}</code>. Keep it for reference.</p>
+      <ul>
+        <li>Category you selected: <strong>{{ category_label(c.submitted_category) }}</strong></li>
+        <li>Submitted: {{ c.created_at|local }}</li>
+        <li>Status: Submitted. A project reviewer will check it. You will get an in-app notification on each status change.</li>
+      </ul>
+      <p class="small text-muted">CivicEye is an academic prototype. Submitting does not guarantee a municipal repair.</p>
+      <a class="btn btn-primary" href="{{ url_for('citizen.complaint_detail', public_id=c.public_id) }}">View complaint</a>
+      <a class="btn btn-outline-secondary" href="{{ url_for('citizen.new_complaint') }}">Report another issue</a>
+    </div>
+  </div>
+</div></div>
+{% endblock %}
